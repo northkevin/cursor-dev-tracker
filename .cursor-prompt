@@ -1,0 +1,7 @@
+Project: Cursor Development Tracker
+Package Manager: pnpm
+Key Requirements:
+  - Use pnpm for all package management operations
+  - Format with prettier (double quotes)
+  - Local SQLite storage via Prisma
+  - TypeScript for all source files

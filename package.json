@@ -1,12 +1,31 @@
 {
-  "name": "cursor-tracker",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "cursor-dev-tracker",
+  "version": "0.1.0",
+  "description": "Development tracking plugin for Cursor IDE",
+  "main": "dist/extension.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint src --ext ts",
+    "test": "jest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "engines": {
+    "cursor": "^0.1.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.x",
+    "sqlite3": "^5.x"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/jest": "^29.x",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "eslint": "^8.x",
+    "jest": "^29.x",
+    "prisma": "^5.x",
+    "ts-jest": "^29.x",
+    "typescript": "^5.x"
+  },
+  "packageManager": "pnpm@9.15.3+sha512.1f79bc245a66eb0b07c5d4d83131240774642caaa86ef7d0434ab47c0d16f66b04e21e0c086eb61e62c77efc4d7f7ec071afad3796af64892fae66509173893a"
 }
