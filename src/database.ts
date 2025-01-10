@@ -1,16 +1,26 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from ".prisma/client";
 import { GitOperationData } from "./services/gitTracker";
 import { BuildData } from "./services/buildTestTracker";
 import { TestData } from "./services/buildTestTracker";
+import { logger } from "./utils/logger";
 
 // Single PrismaClient instance for the application
 const prisma = new PrismaClient();
 
+// Add type for transaction
+type TransactionClient = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use"
+>;
+
 export const initialize = async (): Promise<void> => {
+  logger.debug("Initializing database connection");
   await prisma.$connect();
+  logger.info("Database connection established");
 };
 
 export const createSession = async () => {
+  logger.debug("Creating new session");
   return await prisma.session.create({
     data: {},
   });
@@ -48,7 +58,7 @@ export const recordGitOperation = async (data: {
   command: string;
   gitData: GitOperationData;
 }) => {
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: TransactionClient) => {
     const command = await tx.command.create({
       data: {
         sessionId: data.sessionId,
@@ -179,4 +189,14 @@ export const getDayActivities = async (date: string) => {
       },
     }),
   ]);
+};
+
+export const verifyConnection = async (): Promise<boolean> => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    logger.error("Database verification failed:", error);
+    return false;
+  }
 };

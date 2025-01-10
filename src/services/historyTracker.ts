@@ -2,6 +2,7 @@ import * as yaml from "yaml";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as db from "../database";
+import { logger } from "../utils/logger";
 
 interface TimeSpentDetail {
   duration: number; // in minutes
@@ -332,10 +333,16 @@ export const generateDailySummary = async (
   sessionId: string
 ): Promise<DailySummary> => {
   const today = new Date().toISOString().split("T")[0];
+  logger.debug("Generating daily summary for:", today);
 
   const [commands, fileChanges, aiInteractions] = await db.getDayActivities(
     today
   );
+  logger.debug("Activity counts:", {
+    commands: commands.length,
+    fileChanges: fileChanges.length,
+    aiInteractions: aiInteractions.length,
+  });
 
   const activities: ActivityResult = {
     commands: commands.length,
@@ -348,6 +355,11 @@ export const generateDailySummary = async (
     fileChanges,
     aiInteractions
   );
+  logger.debug("Time tracking summary:", {
+    totalTime: timeTracking.totalTime,
+    categories: Object.keys(timeTracking.byCategory),
+    breaks: timeTracking.breaks.length,
+  });
 
   // Update activity summary with time tracking insights
   const activitySummary = generateActivitySummary(activities);
@@ -375,6 +387,7 @@ export const updateHistoryFile = async (
   summary: DailySummary
 ): Promise<void> => {
   const historyPath = await getHistoryFilePath(workspaceRoot);
+  logger.debug("Updating history file at:", historyPath);
 
   // Read existing history or create new
   let history: Record<string, DailySummary> = {};
@@ -390,4 +403,17 @@ export const updateHistoryFile = async (
 
   // Write back to file
   await fs.writeFile(historyPath, yaml.stringify(history), "utf8");
+  logger.info("History file updated successfully");
+};
+
+export const verifyHistoryFile = async (
+  workspaceRoot: string
+): Promise<boolean> => {
+  try {
+    const historyPath = await getHistoryFilePath(workspaceRoot);
+    await fs.access(historyPath);
+    return true;
+  } catch {
+    return false;
+  }
 };

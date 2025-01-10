@@ -3,27 +3,47 @@
   "version": "0.1.0",
   "description": "Development tracking plugin for Cursor IDE",
   "main": "dist/extension.js",
+  "publisher": "kevinnorth",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/northkevin/cursor-dev-tracker"
+  },
   "scripts": {
     "build": "tsc",
+    "prebuild": "prisma generate",
+    "postinstall": "prisma generate",
     "watch": "tsc -w",
     "lint": "eslint src --ext ts",
     "test": "jest",
-    "package": "pnpm build && pnpm prisma generate && mkdir -p ../test-project/.cursor/extensions && cp -r dist prisma node_modules package.json ../test-project/.cursor/extensions/cursor-dev-tracker/"
+    "package": "vsce package"
   },
   "engines": {
-    "cursor": "^0.1.0"
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "*"
+  ],
+  "categories": ["Other"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "dev-tracker.status",
+        "title": "Dev Tracker: Show Status"
+      }
+    ]
   },
   "dependencies": {
     "@prisma/client": "^5.x",
-    "sqlite3": "^5.x",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
+    "@types/vscode": "^1.80.0",
     "@types/jest": "^29.x",
     "@types/node": "^18.x",
     "@types/yaml": "^1.9.7",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",
+    "@vscode/vsce": "^2.24.0",
     "eslint": "^8.x",
     "jest": "^29.x",
     "prisma": "^5.x",

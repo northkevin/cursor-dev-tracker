@@ -1,7 +1,7 @@
-import { TextDocumentChangeEvent } from "cursor-ide";
 import * as db from "./database";
 import * as aiTracker from "./services/aiTracker";
 import * as gitTracker from "./services/gitTracker";
+import * as vscode from "vscode";
 
 interface SessionState {
   currentSessionId: string | null;
@@ -27,7 +27,7 @@ export const endSession = async (): Promise<void> => {
 };
 
 export const trackFileChange = async (
-  event: TextDocumentChangeEvent
+  event: vscode.TextDocumentChangeEvent
 ): Promise<void> => {
   if (!state.currentSessionId) return;
 
@@ -49,4 +49,8 @@ export const trackAIInteraction = async (
 export const trackGitOperation = async (operation: string): Promise<void> => {
   if (!state.currentSessionId) return;
   await gitTracker.trackOperation(state.currentSessionId, operation);
+};
+
+export const isSessionActive = (): boolean => {
+  return state.currentSessionId !== null;
 };

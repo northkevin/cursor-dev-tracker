@@ -1,0 +1,15 @@
+{
+  "name": "cursor-dev-tracker",
+  "version": "0.1.0",
+  "description": "Development tracking plugin for Cursor IDE",
+  "main": "dist/extension.js",
+  "activationEvents": ["*"],
+  "contributes": {
+    "commands": [
+      {
+        "command": "dev-tracker.status",
+        "title": "Dev Tracker: Show Status"
+      }
+    ]
+  }
+}
