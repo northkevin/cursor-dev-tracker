@@ -7,18 +7,21 @@
     "build": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src --ext ts",
-    "test": "jest"
+    "test": "jest",
+    "package": "pnpm build && pnpm prisma generate && mkdir -p ../test-project/.cursor/extensions && cp -r dist prisma node_modules package.json ../test-project/.cursor/extensions/cursor-dev-tracker/"
   },
   "engines": {
     "cursor": "^0.1.0"
   },
   "dependencies": {
     "@prisma/client": "^5.x",
-    "sqlite3": "^5.x"
+    "sqlite3": "^5.x",
+    "yaml": "^2.7.0"
   },
   "devDependencies": {
-    "@types/node": "^18.x",
     "@types/jest": "^29.x",
+    "@types/node": "^18.x",
+    "@types/yaml": "^1.9.7",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",
     "eslint": "^8.x",

@@ -142,3 +142,41 @@ export const recordTestOperation = async (data: {
     return command;
   });
 };
+
+export const getDayActivities = async (date: string) => {
+  const startOfDay = new Date(date);
+  const endOfDay = new Date(date);
+  endOfDay.setDate(endOfDay.getDate() + 1);
+
+  return await prisma.$transaction([
+    prisma.command.findMany({
+      where: {
+        timestamp: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+      include: {
+        gitData: true,
+        buildData: true,
+        testData: true,
+      },
+    }),
+    prisma.fileChange.findMany({
+      where: {
+        timestamp: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+    }),
+    prisma.aIInteraction.findMany({
+      where: {
+        timestamp: {
+          gte: startOfDay,
+          lt: endOfDay,
+        },
+      },
+    }),
+  ]);
+};
