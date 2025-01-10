@@ -27,7 +27,15 @@ export async function activate(context: ExtensionContext) {
 
     cursor.commands.registerCommand("dev-tracker.endSession", () => {
       sessionManager.endSession();
-    })
+    }),
+
+    // Add AI interaction tracking
+    cursor.commands.registerCommand(
+      "dev-tracker.trackAIInteraction",
+      async (prompt: string, response: string) => {
+        await sessionManager.trackAIInteraction(prompt, response);
+      }
+    )
   );
 }
 

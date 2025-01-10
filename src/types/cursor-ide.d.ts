@@ -22,7 +22,7 @@ declare module "cursor-ide" {
   export interface Commands {
     registerCommand: (
       command: string,
-      callback: () => void
+      callback: (...args: any[]) => void
     ) => { dispose(): void };
   }
 
