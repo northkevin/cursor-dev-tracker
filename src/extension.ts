@@ -1,46 +1,58 @@
 import { ExtensionContext, TextDocumentChangeEvent } from "cursor-ide";
-import { SessionManager } from "./sessionManager";
-import { DatabaseManager } from "./database";
-
-let sessionManager: SessionManager;
+import * as session from "./sessionManager";
+import * as db from "./database";
 
 export async function activate(context: ExtensionContext) {
   // Initialize database
-  const dbManager = new DatabaseManager();
-  await dbManager.initialize();
+  await db.initialize();
 
   // Start session tracking
-  sessionManager = new SessionManager(dbManager);
-  await sessionManager.startSession();
+  await session.startSession();
 
   // Register event listeners
   context.subscriptions.push(
     cursor.workspace.onDidChangeTextDocument(
       (event: TextDocumentChangeEvent) => {
-        sessionManager.trackFileChange(event);
+        session.trackFileChange(event);
       }
     ),
 
     cursor.commands.registerCommand("dev-tracker.startSession", () => {
-      sessionManager.startSession();
+      session.startSession();
     }),
 
     cursor.commands.registerCommand("dev-tracker.endSession", () => {
-      sessionManager.endSession();
+      session.endSession();
     }),
 
     // Add AI interaction tracking
     cursor.commands.registerCommand(
       "dev-tracker.trackAIInteraction",
       async (prompt: string, response: string) => {
-        await sessionManager.trackAIInteraction(prompt, response);
+        await session.trackAIInteraction(prompt, response);
+      }
+    ),
+
+    // Add Git operation tracking
+    cursor.commands.registerCommand(
+      "dev-tracker.trackGitOperation",
+      async (operation: string) => {
+        await session.trackGitOperation(operation);
       }
     )
   );
+
+  // Watch for Git operations
+  const gitOperations = ["commit", "push", "pull", "merge", "checkout"];
+  gitOperations.forEach((operation) => {
+    context.subscriptions.push(
+      cursor.commands.registerCommand(`git.${operation}`, async () => {
+        await session.trackGitOperation(operation);
+      })
+    );
+  });
 }
 
 export function deactivate() {
-  if (sessionManager) {
-    sessionManager.endSession();
-  }
+  session.endSession();
 }

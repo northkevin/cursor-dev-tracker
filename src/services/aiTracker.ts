@@ -1,27 +1,25 @@
-import { DatabaseManager } from "../database";
+import * as db from "../database";
 
-export class AITracker {
-  private sessionId: string | null = null;
-  private dbManager: DatabaseManager;
-
-  constructor(dbManager: DatabaseManager) {
-    this.dbManager = dbManager;
-  }
-
-  setSessionId(sessionId: string) {
-    this.sessionId = sessionId;
-  }
-
-  async trackInteraction(prompt: string, response: string): Promise<void> {
-    if (!this.sessionId) {
-      console.warn("No active session for AI interaction tracking");
-      return;
-    }
-
-    await this.dbManager.recordAIInteraction({
-      sessionId: this.sessionId,
-      prompt,
-      response,
-    });
-  }
+interface TrackerState {
+  sessionId: string | null;
 }
+
+const state: TrackerState = {
+  sessionId: null,
+};
+
+export const setSessionId = (sessionId: string): void => {
+  state.sessionId = sessionId;
+};
+
+export const trackInteraction = async (
+  sessionId: string,
+  prompt: string,
+  response: string
+): Promise<void> => {
+  await db.recordAIInteraction({
+    sessionId,
+    prompt,
+    response,
+  });
+};

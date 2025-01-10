@@ -5,3 +5,4 @@ Key Requirements:
   - Format with prettier (double quotes)
   - Local SQLite storage via Prisma
   - TypeScript for all source files
+  - Prefer functional implementations over classes unless explicitly required

@@ -1,42 +1,52 @@
-import { DatabaseManager } from "./database";
 import { TextDocumentChangeEvent } from "cursor-ide";
-import { AITracker } from "./services/aiTracker";
+import * as db from "./database";
+import * as aiTracker from "./services/aiTracker";
+import * as gitTracker from "./services/gitTracker";
 
-export class SessionManager {
-  private currentSessionId: string | null = null;
-  private dbManager: DatabaseManager;
-  private aiTracker: AITracker;
-
-  constructor(dbManager: DatabaseManager) {
-    this.dbManager = dbManager;
-    this.aiTracker = new AITracker(dbManager);
-  }
-
-  async startSession(): Promise<void> {
-    const session = await this.dbManager.createSession();
-    this.currentSessionId = session.id;
-    this.aiTracker.setSessionId(session.id);
-    console.log(`Started new session: ${session.id}`);
-  }
-
-  async endSession(): Promise<void> {
-    if (this.currentSessionId) {
-      await this.dbManager.endSession(this.currentSessionId);
-      this.currentSessionId = null;
-    }
-  }
-
-  async trackFileChange(event: TextDocumentChangeEvent): Promise<void> {
-    if (!this.currentSessionId) return;
-
-    await this.dbManager.recordFileChange({
-      sessionId: this.currentSessionId,
-      filePath: event.document.uri.fsPath,
-      changeType: "modified",
-    });
-  }
-
-  async trackAIInteraction(prompt: string, response: string): Promise<void> {
-    await this.aiTracker.trackInteraction(prompt, response);
-  }
+interface SessionState {
+  currentSessionId: string | null;
 }
+
+const state: SessionState = {
+  currentSessionId: null,
+};
+
+export const startSession = async (): Promise<void> => {
+  const session = await db.createSession();
+  state.currentSessionId = session.id;
+  aiTracker.setSessionId(session.id);
+  gitTracker.setSessionId(session.id);
+  console.log(`Started new session: ${session.id}`);
+};
+
+export const endSession = async (): Promise<void> => {
+  if (state.currentSessionId) {
+    await db.endSession(state.currentSessionId);
+    state.currentSessionId = null;
+  }
+};
+
+export const trackFileChange = async (
+  event: TextDocumentChangeEvent
+): Promise<void> => {
+  if (!state.currentSessionId) return;
+
+  await db.recordFileChange({
+    sessionId: state.currentSessionId,
+    filePath: event.document.uri.fsPath,
+    changeType: "modified",
+  });
+};
+
+export const trackAIInteraction = async (
+  prompt: string,
+  response: string
+): Promise<void> => {
+  if (!state.currentSessionId) return;
+  await aiTracker.trackInteraction(state.currentSessionId, prompt, response);
+};
+
+export const trackGitOperation = async (operation: string): Promise<void> => {
+  if (!state.currentSessionId) return;
+  await gitTracker.trackOperation(state.currentSessionId, operation);
+};

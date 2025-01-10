@@ -38,11 +38,55 @@ model AIInteraction {
 }
 
 model Command {
-    id        String   @id @default(uuid())
+    id        String          @id @default(uuid())
     sessionId String
-    timestamp DateTime @default(now())
+    timestamp DateTime        @default(now())
     command   String
     type      String // "git", "build", "test", etc.
+    gitData   GitOperation?
+    buildData BuildOperation?
+    testData  TestOperation?
 
     session Session @relation(fields: [sessionId], references: [id])
+}
+
+model GitOperation {
+    id           String  @id @default(uuid())
+    commandId    String  @unique
+    operation    String // "commit", "push", "pull", "merge", etc.
+    branch       String
+    commitHash   String?
+    filesChanged String? // JSON array of changed files
+
+    command Command @relation(fields: [commandId], references: [id])
+}
+
+model BuildOperation {
+    id          String  @id @default(uuid())
+    commandId   String  @unique
+    environment String // "development", "production"
+    framework   String // "next", "vite", "webpack", etc.
+    success     Boolean
+    duration    Int // in milliseconds
+    errors      String? // JSON array of error messages
+    warnings    String? // JSON array of warning messages
+    outputLog   String? // Full console output if needed
+
+    command Command @relation(fields: [commandId], references: [id])
+}
+
+model TestOperation {
+    id           String  @id @default(uuid())
+    commandId    String  @unique
+    framework    String // "jest", "vitest", "playwright", etc.
+    success      Boolean
+    duration     Int // in milliseconds
+    totalTests   Int
+    passedTests  Int
+    failedTests  Int
+    skippedTests Int
+    errors       String? // JSON array of error messages
+    outputLog    String? // Full console output if needed
+
+    command Command @relation(fields: [commandId], references: [id])
 }
