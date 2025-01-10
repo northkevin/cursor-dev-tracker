@@ -23,7 +23,9 @@
   "activationEvents": [
     "*"
   ],
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "contributes": {
     "commands": [
       {
@@ -37,9 +39,9 @@
     "yaml": "^2.7.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
     "@types/jest": "^29.x",
-    "@types/node": "^18.x",
+    "@types/node": "^18.19.70",
+    "@types/vscode": "^1.80.0",
     "@types/yaml": "^1.9.7",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",

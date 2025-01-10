@@ -1,4 +1,4 @@
-import { PrismaClient } from ".prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { GitOperationData } from "./services/gitTracker";
 import { BuildData } from "./services/buildTestTracker";
 import { TestData } from "./services/buildTestTracker";
@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // Add type for transaction
 type TransactionClient = Omit<
   PrismaClient,
-  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use"
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
 export const initialize = async (): Promise<void> => {

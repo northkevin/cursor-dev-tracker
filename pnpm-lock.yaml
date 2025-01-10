@@ -19,7 +19,7 @@ importers:
         specifier: ^29.x
         version: 29.5.14
       '@types/node':
-        specifier: ^18.x
+        specifier: ^18.19.70
         version: 18.19.70
       '@types/vscode':
         specifier: ^1.80.0
