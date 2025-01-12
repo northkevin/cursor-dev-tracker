@@ -1,8 +1,30 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../prisma/client";
 import { GitOperationData } from "./services/gitTracker";
 import { BuildData } from "./services/buildTestTracker";
 import { TestData } from "./services/buildTestTracker";
 import { logger } from "./utils/logger";
+import * as path from "path";
+import * as fs from "fs";
+import { PrismaClientOptions, Sql } from "../prisma/client/runtime/library";
+
+const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+const dbPath = path.join(
+  homeDir,
+  ".cursor",
+  "dev-tracker",
+  "data",
+  "dev-tracker.db"
+);
+
+// Ensure the directory exists before setting DATABASE_URL
+try {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  console.log("📁 Created database directory at:", path.dirname(dbPath));
+} catch (error) {
+  console.error("❌ Failed to create database directory:", error);
+}
+
+process.env.DATABASE_URL = `file:${dbPath}`;
 
 // Single PrismaClient instance for the application
 const prisma = new PrismaClient();
@@ -15,8 +37,17 @@ type TransactionClient = Omit<
 
 export const initialize = async (): Promise<void> => {
   logger.debug("Initializing database connection");
-  await prisma.$connect();
-  logger.info("Database connection established");
+  console.log("🔌 Connecting to database at:", dbPath);
+  try {
+    await prisma.$connect();
+    // Force database creation by executing a query
+    await prisma.$executeRaw`SELECT 1`;
+    logger.info("Database connection established");
+    console.log("✅ Database initialized successfully");
+  } catch (error) {
+    console.error("❌ Database initialization failed:", error);
+    throw error;
+  }
 };
 
 export const createSession = async () => {
@@ -193,10 +224,20 @@ export const getDayActivities = async (date: string) => {
 
 export const verifyConnection = async (): Promise<boolean> => {
   try {
+    console.log("🔍 Verifying database connection...");
     await prisma.$queryRaw`SELECT 1`;
+    console.log("✅ Database connection verified");
     return true;
   } catch (error) {
     logger.error("Database verification failed:", error);
+    console.error("❌ Database error details:", error);
     return false;
   }
+};
+
+export const $executeRaw = async (
+  query: TemplateStringsArray | Sql,
+  ...values: any[]
+) => {
+  return await prisma.$executeRaw(query, ...values);
 };

@@ -10,15 +10,16 @@
   },
   "scripts": {
     "build": "tsc",
-    "prebuild": "prisma generate",
-    "postinstall": "prisma generate",
-    "watch": "tsc -w",
+    "prisma:generate": "prisma generate",
+    "clean": "rimraf dist prisma/client",
+    "watch": "tsc -w --preserveWatchOutput",
     "lint": "eslint src --ext ts",
     "test": "jest",
-    "package": "vsce package"
+    "package": "pnpm clean && pnpm prisma:generate && pnpm build && pnpm exec vsce package --allow-star-activation --no-yarn"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.80.0",
+    "pnpm": ">=9.15.3"
   },
   "activationEvents": [
     "*"
@@ -31,26 +32,31 @@
       {
         "command": "dev-tracker.status",
         "title": "Dev Tracker: Show Status"
+      },
+      {
+        "command": "dev-tracker.showPost",
+        "title": "Dev Tracker: Show Brain Upgrade Post"
       }
     ]
   },
   "dependencies": {
-    "@prisma/client": "^5.x",
+    "@prisma/client": "^5.22.0",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@types/jest": "^29.x",
-    "@types/node": "^18.19.70",
-    "@types/vscode": "^1.80.0",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.73.0",
     "@types/yaml": "^1.9.7",
-    "@typescript-eslint/eslint-plugin": "^6.x",
-    "@typescript-eslint/parser": "^6.x",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "@vscode/vsce": "^2.24.0",
-    "eslint": "^8.x",
+    "eslint": "^8.57.0",
     "jest": "^29.x",
     "prisma": "^5.x",
+    "rimraf": "^5.0.5",
     "ts-jest": "^29.x",
     "typescript": "^5.x"
   },
-  "packageManager": "pnpm@9.15.3+sha512.1f79bc245a66eb0b07c5d4d83131240774642caaa86ef7d0434ab47c0d16f66b04e21e0c086eb61e62c77efc4d7f7ec071afad3796af64892fae66509173893a"
+  "packageManager": "pnpm@9.15.3"
 }

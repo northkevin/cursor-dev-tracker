@@ -8,3 +8,10 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+node_modules/**
+!node_modules/yaml/**
+!node_modules/yaml/dist/**
+!node_modules/yaml/browser/**
+!prisma/client/**
+!prisma/schema.prisma
+!src/types/**
