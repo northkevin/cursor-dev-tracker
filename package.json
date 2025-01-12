@@ -50,7 +50,7 @@
       },
       {
         "command": "dev-tracker.validate",
-        "title": "Dev Tracker: Validate Installation",
+        "title": "Dev Tracker: Run Comprehensive Validation",
         "category": "Dev Tracker"
       },
       {
@@ -67,9 +67,9 @@
     "keybindings": [
       {
         "command": "dev-tracker.validate",
-        "key": "ctrl+shift+v",
-        "mac": "cmd+shift+v",
-        "when": "editorTextFocus"
+        "key": "ctrl+shift+alt+v",
+        "mac": "cmd+shift+alt+v",
+        "when": "editorFocus"
       }
     ]
   },

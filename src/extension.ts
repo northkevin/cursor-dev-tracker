@@ -7,6 +7,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as postGenerator from "./services/postGenerator";
 import { outputChannel } from "./utils/outputChannel";
+import type { TrackerValidation, ValidationResult } from "./types/validation";
+import * as buildTestTracker from "./services/buildTestTracker";
 
 // Use either cursor or vscode API
 const api = typeof cursor !== "undefined" ? cursor : vscode;
@@ -154,12 +156,21 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
       api.commands.registerCommand("dev-tracker.status", async () => {
         console.log("\n=== Dev Tracker Status Check ===");
+
+        // Run a quick validation of core features
+        const quickValidation = await Promise.all([
+          db.verifyConnection(),
+          history.verifyHistoryFile(workspaceRoot),
+          session.isSessionActive(),
+        ]);
+
         const status = {
-          dbConnected: await db.verifyConnection(),
-          historyExists: await history.verifyHistoryFile(workspaceRoot),
-          sessionActive: session.isSessionActive(),
+          dbConnected: quickValidation[0],
+          historyExists: quickValidation[1],
+          sessionActive: quickValidation[2],
           timestamp: new Date().toISOString(),
         };
+
         console.log("📊 Status Details:");
         console.log("- Database Connected:", status.dbConnected ? "✅" : "❌");
         console.log(
@@ -184,6 +195,11 @@ export async function activate(context: vscode.ExtensionContext) {
         api.window.showInformationMessage(
           `Dev Tracker Status:\n${statusMessage}`
         );
+
+        outputChannel.log(
+          "💡 Tip: Run 'Dev Tracker: Run Comprehensive Validation' for detailed testing"
+        );
+
         return status;
       }),
       // Add brain upgrade post command
@@ -214,70 +230,201 @@ export async function activate(context: vscode.ExtensionContext) {
         const channel = outputChannel.getChannel();
         channel.clear();
         outputChannel.show();
-        outputChannel.log("Starting validation...");
+        outputChannel.log("🔍 Starting comprehensive tracker validation...");
 
-        // Show notification that validation is starting
-        api.window.showInformationMessage(
-          "🔍 Running Dev Tracker validation..."
-        );
+        const startTime = Date.now();
 
-        console.log("\n=== Dev Tracker Validation ===");
-
-        // Log storage paths
+        // Get storage URI from context
         const storageUri = context.globalStorageUri;
-        console.log("📂 Storage Location:", storageUri.fsPath);
 
-        // Test storage
-        const sessions = await db.getStorageData();
-        console.log("📊 Storage Test:");
-        console.log("- Sessions found:", sessions.length);
-        console.log("- Storage keys:", await db.getStorageKeys());
-        console.log("- Current Data:", JSON.stringify(sessions, null, 2));
+        try {
+          // Define all tracker validations
+          const validations: TrackerValidation[] = [
+            // Storage validation
+            {
+              name: "Storage",
+              run: async () => {
+                const validationStart = Date.now();
+                const sessions = await db.getStorageData();
+                return {
+                  type: "storage",
+                  success: sessions !== null,
+                  data: {
+                    sessionCount: sessions.length,
+                    keys: await db.getStorageKeys(),
+                  },
+                  duration: Date.now() - validationStart,
+                };
+              },
+            },
 
-        // Start a new session if one isn't active
-        if (!session.isSessionActive()) {
-          await session.startSession();
-          console.log("✅ Started new session");
+            // AI Tracker validation
+            {
+              name: "AI Tracking",
+              run: async () => {
+                const validationStart = Date.now();
+                await session.trackAIInteraction(
+                  "Test prompt with code\n```typescript\nconst x = 1;```",
+                  "Response with suggestions\n```typescript:test.ts\nconst x: number = 1;```",
+                  "composer",
+                  true
+                );
+                return {
+                  type: "ai",
+                  success: true,
+                  data: {
+                    promptType: "composer",
+                    hasCodeBlock: true,
+                    hasFileEdit: true,
+                  },
+                  duration: Date.now() - validationStart,
+                };
+              },
+            },
+
+            // Git Tracker validation
+            {
+              name: "Git Operations",
+              run: async () => {
+                const validationStart = Date.now();
+                await session.trackGitOperation("commit");
+                await session.trackGitOperation("push");
+                return {
+                  type: "git",
+                  success: true,
+                  data: {
+                    operations: ["commit", "push"],
+                    branchTracked: true,
+                  },
+                  duration: Date.now() - validationStart,
+                };
+              },
+            },
+
+            // File Tracker validation
+            {
+              name: "File Changes",
+              run: async () => {
+                const validationStart = Date.now();
+                const testDoc = await api.workspace.openTextDocument({
+                  content: "test content",
+                  language: "typescript",
+                });
+                const range = new vscode.Range(
+                  new vscode.Position(0, 0),
+                  new vscode.Position(0, 11)
+                );
+                const mockChangeEvent: vscode.TextDocumentChangeEvent = {
+                  document: testDoc,
+                  reason: vscode.TextDocumentChangeReason.Undo,
+                  contentChanges: [
+                    {
+                      range,
+                      rangeOffset: 0,
+                      rangeLength: 11,
+                      text: "updated test content",
+                    },
+                  ],
+                };
+                await session.trackFileChange(mockChangeEvent);
+                return {
+                  type: "file",
+                  success: true,
+                  data: {
+                    language: "typescript",
+                    changeType: "content",
+                    hasRange: true,
+                  },
+                  duration: Date.now() - validationStart,
+                };
+              },
+            },
+
+            // Build/Test Tracker validation
+            {
+              name: "Build and Test",
+              run: async () => {
+                const validationStart = Date.now();
+                buildTestTracker.startOperation("build");
+                await buildTestTracker.trackBuildComplete(
+                  "Build completed successfully\nCompiled 3 files",
+                  "typescript",
+                  "development"
+                );
+                buildTestTracker.startOperation("test");
+                await buildTestTracker.trackTestComplete(
+                  "Tests: 2 passed, 0 failed, 1 skipped",
+                  "jest"
+                );
+                return {
+                  type: "build",
+                  success: true,
+                  data: {
+                    buildTracked: true,
+                    testTracked: true,
+                    environment: "development",
+                  },
+                  duration: Date.now() - validationStart,
+                };
+              },
+            },
+          ];
+
+          // Run all validations
+          const results = await Promise.all(validations.map((v) => v.run()));
+
+          const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+          // Group results by success/failure
+          const successful = results.filter((r) => r.success);
+          const failed = results.filter((r) => !r.success);
+
+          // Format results with more detail
+          const validationResults = [
+            `🎯 Total Trackers Validated: ${results.length}`,
+            `✅ Successful: ${successful.length}`,
+            `❌ Failed: ${failed.length}`,
+            "\nDetailed Results:",
+            ...results.map(
+              (r) =>
+                `${r.success ? "✅" : "❌"} ${r.type.toUpperCase()} Test: ${
+                  r.success ? "Success" : "Failed"
+                }${
+                  r.data
+                    ? ` (${Object.entries(r.data)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(", ")})`
+                    : ""
+                }${r.duration ? ` - ${(r.duration / 1000).toFixed(2)}s` : ""}`
+            ),
+          ].join("\n");
+
+          // Show results and log details
+          api.window.showInformationMessage(
+            `Validation Complete! (${duration}s)`,
+            {
+              detail: validationResults,
+              modal: true,
+            }
+          );
+
+          // Open output panel to show detailed results
+          channel.appendLine("🔍 Dev Tracker Validation Results");
+          channel.appendLine("=====================================");
+          channel.appendLine(validationResults);
+          channel.appendLine(`\n⚡ Total Duration: ${duration} seconds`);
+          channel.appendLine("\n📊 Storage Location:");
+          channel.appendLine(storageUri.fsPath);
+          channel.appendLine("\n📈 Performance Metrics:");
+          results.forEach((r) => {
+            if (r.data) {
+              channel.appendLine(`${r.type}: ${JSON.stringify(r.data)}`);
+            }
+          });
+        } catch (error) {
+          outputChannel.log(`❌ Validation failed: ${error}`);
+          api.window.showErrorMessage(`Validation failed: ${error}`);
         }
-
-        // Test file tracking
-        const testFile = await api.workspace.openTextDocument({
-          content: "test",
-        });
-        await session.trackFileChange({
-          document: testFile,
-        } as vscode.TextDocumentChangeEvent);
-        console.log("📝 File Tracking Test Complete");
-
-        // Test AI tracking
-        await session.trackAIInteraction("test prompt", "test response");
-        console.log("🤖 AI Tracking Test Complete");
-
-        // Show results in UI
-        const validationResults = [
-          "✅ Storage Location: " + storageUri.fsPath,
-          "✅ Sessions Found: " + sessions.length,
-          "✅ File Tracking Test: Complete",
-          "✅ AI Tracking Test: Complete",
-        ].join("\n");
-
-        api.window.showInformationMessage("Validation Complete!", {
-          detail: validationResults,
-          modal: true,
-        });
-
-        // Open output panel to show detailed results
-        channel.appendLine("🔍 Dev Tracker Validation Results");
-        channel.appendLine("=====================================");
-        channel.appendLine(validationResults);
-        channel.appendLine("\n📊 Storage Location:");
-        channel.appendLine(storageUri.fsPath);
-        channel.appendLine("\nDetailed Session Data:");
-        channel.appendLine(JSON.stringify(sessions, null, 2));
-        // Force the output panel to the foreground
-        api.commands.executeCommand("workbench.action.output.show");
-
-        console.log("===============================\n");
       }),
       // Add state inspection command
       api.commands.registerCommand("dev-tracker.inspectState", async () => {

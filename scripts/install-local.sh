@@ -50,4 +50,10 @@ echo "📦 Installing new version..."
 cursor --install-extension "$VSIX_FILE"
 
 echo "✅ Extension installation complete!"
-echo "💡 Tip: Run 'Dev Tracker: Show Status' to verify installation"
+echo "💡 Tip: Run these commands to verify installation:"
+echo "   1. Dev Tracker: Show Status"
+echo "   2. Dev Tracker: Run Comprehensive Validation (ctrl+shift+alt+v)"
+
+# Optional: Run validation automatically
+echo "🔍 Running validation..."
+cursor --command "dev-tracker.validate"
