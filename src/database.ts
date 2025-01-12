@@ -18,13 +18,16 @@ export const initialize = async (
 };
 
 export const createSession = async () => {
-  const session = {
+  const session: Session = {
     id: Date.now().toString(),
     startTime: new Date(),
     endTime: null,
+    fileChanges: [],
+    aiInteractions: [],
+    commands: [],
   };
 
-  const sessions = await globalState.get("sessions", []);
+  const sessions = await globalState.get<Session[]>("sessions", []);
   sessions.push(session);
   await globalState.update("sessions", sessions);
   return session;
@@ -265,4 +268,12 @@ export const getDayActivities = async (date: string) => {
 
 export const verifyConnection = async (): Promise<boolean> => {
   return globalState !== undefined;
+};
+
+export const getStorageData = async (): Promise<Session[]> => {
+  return await globalState.get<Session[]>("sessions", []);
+};
+
+export const getStorageKeys = async (): Promise<readonly string[]> => {
+  return await globalState.keys();
 };

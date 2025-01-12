@@ -199,14 +199,18 @@ export async function activate(context: vscode.ExtensionContext) {
         console.log("\n=== Dev Tracker Validation ===");
 
         // Test storage
-        const sessions = await globalState.get("sessions", []);
+        const sessions = await db.getStorageData();
         console.log("📊 Storage Test:");
         console.log("- Sessions found:", sessions.length);
-        console.log("- Storage keys:", await globalState.keys());
+        console.log("- Storage keys:", await db.getStorageKeys());
 
         // Test file tracking
-        const testFile = await api.workspace.openTextDocument({ content: "test" });
-        await session.trackFileChange({ document: testFile });
+        const testFile = await api.workspace.openTextDocument({
+          content: "test",
+        });
+        await session.trackFileChange({
+          document: testFile,
+        } as vscode.TextDocumentChangeEvent);
         console.log("📝 File Tracking Test Complete");
 
         // Test AI tracking
