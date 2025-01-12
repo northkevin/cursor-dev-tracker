@@ -3,6 +3,8 @@ import { GitOperationData } from "./services/gitTracker";
 import { BuildData } from "./services/buildTestTracker";
 import { TestData } from "./services/buildTestTracker";
 import { logger } from "./utils/logger";
+import { outputChannel } from "./utils/outputChannel";
+import * as aiTracker from "./services/aiTracker";
 
 let globalState: vscode.Memento;
 
@@ -48,6 +50,9 @@ interface FileChange {
   timestamp: Date;
   filePath: string;
   changeType: string;
+  language?: string;
+  lineCount?: number;
+  changeSize?: number;
 }
 
 interface AIInteraction {
@@ -56,6 +61,19 @@ interface AIInteraction {
   timestamp: Date;
   prompt: string;
   response: string;
+  type: "chat" | "composer" | "inline";
+  success: boolean;
+  duration: number;
+  metrics: {
+    promptLength: number;
+    responseLength: number;
+    codeBlockCount: number;
+    fileEditCount: number;
+    categories: string[];
+    languages: string[];
+    sentiment: "positive" | "negative" | "neutral";
+    hasError: boolean;
+  };
 }
 
 interface Command {
@@ -69,6 +87,8 @@ interface Command {
     branch: string;
     commitHash?: string;
     filesChanged?: string | null;
+    commitMessage?: string;
+    linesChanged?: { added: number; removed: number };
   };
   buildData?: {
     environment: string;
@@ -105,12 +125,16 @@ export const recordFileChange = async (data: {
   sessionId: string;
   filePath: string;
   changeType: string;
+  language?: string;
+  lineCount?: number;
+  changeSize?: number;
 }) => {
   const fileChange = {
     id: Date.now().toString(),
     timestamp: new Date(),
     ...data,
   };
+  outputChannel.log(`📝 File Change: ${data.filePath} (${data.changeType})`);
 
   const sessions = await globalState.get<Session[]>("sessions", []);
   const updatedSessions = sessions.map((session) =>
@@ -122,6 +146,7 @@ export const recordFileChange = async (data: {
       : session
   );
   await globalState.update("sessions", updatedSessions);
+  outputChannel.log(`✅ Stored file change for session ${data.sessionId}`);
   return fileChange;
 };
 
@@ -129,11 +154,40 @@ export const recordAIInteraction = async (data: {
   sessionId: string;
   prompt: string;
   response: string;
+  type: "chat" | "composer" | "inline";
+  success: boolean;
+  duration: number;
+  metrics?: {
+    promptLength: number;
+    responseLength: number;
+    codeBlockCount: number;
+    fileEditCount: number;
+    categories: string[];
+    languages: string[];
+    sentiment: "positive" | "negative" | "neutral";
+    hasError: boolean;
+  };
 }) => {
-  const aiInteraction = {
+  outputChannel.log(`🤖 AI Interaction: ${data.prompt.slice(0, 50)}...`);
+
+  const metrics = await aiTracker.analyzeInteraction(
+    data.prompt,
+    data.response
+  );
+  outputChannel.log(
+    `📊 AI Metrics: ${metrics.categories.join(", ")} (${metrics.sentiment})`
+  );
+
+  const aiInteraction: AIInteraction = {
     id: Date.now().toString(),
     timestamp: new Date(),
-    ...data,
+    sessionId: data.sessionId,
+    prompt: data.prompt,
+    response: data.response,
+    type: data.type,
+    success: data.success,
+    duration: data.duration,
+    metrics: metrics,
   };
 
   const sessions = await globalState.get<Session[]>("sessions", []);
@@ -146,6 +200,7 @@ export const recordAIInteraction = async (data: {
       : session
   );
   await globalState.update("sessions", updatedSessions);
+  outputChannel.log(`✅ Stored AI interaction for session ${data.sessionId}`);
   return aiInteraction;
 };
 
@@ -154,6 +209,9 @@ export const recordGitOperation = async (data: {
   command: string;
   gitData: GitOperationData;
 }) => {
+  outputChannel.log(
+    `📦 Git Operation: ${data.gitData.operation} on ${data.gitData.branch}`
+  );
   const command = {
     id: Date.now().toString(),
     timestamp: new Date(),
@@ -178,6 +236,7 @@ export const recordGitOperation = async (data: {
       : session
   );
   await globalState.update("sessions", updatedSessions);
+  outputChannel.log(`✅ Stored git operation for session ${data.sessionId}`);
   return command;
 };
 
@@ -186,6 +245,11 @@ export const recordBuildOperation = async (data: {
   command: string;
   buildData: BuildData;
 }) => {
+  outputChannel.log(
+    `🔨 Build Operation: ${data.command} (${data.buildData.framework}) - ${
+      data.buildData.success ? "✅ Success" : "❌ Failed"
+    }`
+  );
   const command = {
     id: Date.now().toString(),
     timestamp: new Date(),
@@ -213,6 +277,7 @@ export const recordBuildOperation = async (data: {
       : session
   );
   await globalState.update("sessions", updatedSessions);
+  outputChannel.log(`✅ Stored build operation for session ${data.sessionId}`);
   return command;
 };
 
@@ -221,6 +286,9 @@ export const recordTestOperation = async (data: {
   command: string;
   testData: TestData;
 }) => {
+  outputChannel.log(
+    `🧪 Test Operation: ${data.command} - Passed: ${data.testData.passedTests}/${data.testData.totalTests}`
+  );
   const command = {
     id: Date.now().toString(),
     timestamp: new Date(),
@@ -245,10 +313,17 @@ export const recordTestOperation = async (data: {
       : session
   );
   await globalState.update("sessions", updatedSessions);
+  outputChannel.log(`✅ Stored test operation for session ${data.sessionId}`);
   return command;
 };
 
-export const getDayActivities = async (date: string) => {
+export const getDayActivities = async (
+  date: string
+): Promise<{
+  commands: Command[];
+  fileChanges: FileChange[];
+  aiInteractions: AIInteraction[];
+}> => {
   const startOfDay = new Date(date);
   const endOfDay = new Date(date);
   endOfDay.setDate(endOfDay.getDate() + 1);
@@ -276,4 +351,16 @@ export const getStorageData = async (): Promise<Session[]> => {
 
 export const getStorageKeys = async (): Promise<readonly string[]> => {
   return await globalState.keys();
+};
+
+export const cleanStorage = async (cleanSessions: Session[]): Promise<void> => {
+  // Only clean our extension's sessions data
+  const ourKeys = await globalState.keys();
+  if (!ourKeys.includes("sessions")) {
+    outputChannel.log("⚠️ No sessions data found to clean");
+    return;
+  }
+
+  await globalState.update("sessions", cleanSessions);
+  outputChannel.log("✅ Dev Tracker sessions cleaned");
 };

@@ -1,15 +1,18 @@
+import { outputChannel } from "./outputChannel";
 const DEBUG = true;
 
 export const logger = {
   debug: (message: string, ...args: any[]) => {
     if (DEBUG) {
-      console.log(`[Dev Tracker Debug] ${message}`, ...args);
+      outputChannel.log(`[Debug] ${message} ${args.join(" ")}`);
     }
   },
   info: (message: string, ...args: any[]) => {
-    console.log(`[Dev Tracker] ${message}`, ...args);
+    outputChannel.log(`[Info] ${message} ${args.join(" ")}`);
   },
   error: (message: string, error?: any) => {
-    console.error(`[Dev Tracker Error] ${message}`, error || "");
+    outputChannel.log(
+      `[Error] ${message} ${error ? JSON.stringify(error) : ""}`
+    );
   },
 };

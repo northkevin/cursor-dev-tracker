@@ -30,15 +30,46 @@
     "commands": [
       {
         "command": "dev-tracker.status",
-        "title": "Dev Tracker: Show Status"
+        "title": "Dev Tracker: Show Status",
+        "category": "Dev Tracker"
+      },
+      {
+        "command": "dev-tracker.cleanupSessions",
+        "title": "Dev Tracker: Clean Old Sessions",
+        "category": "Dev Tracker"
+      },
+      {
+        "command": "dev-tracker.resetStorage",
+        "title": "Dev Tracker: Reset All Storage",
+        "category": "Dev Tracker"
       },
       {
         "command": "dev-tracker.showPost",
-        "title": "Dev Tracker: Show Brain Upgrade Post"
+        "title": "Dev Tracker: Show Brain Upgrade Post",
+        "category": "Dev Tracker"
       },
       {
         "command": "dev-tracker.validate",
-        "title": "Dev Tracker: Run Validation Tests"
+        "title": "Dev Tracker: Validate Installation",
+        "category": "Dev Tracker"
+      },
+      {
+        "command": "dev-tracker.inspectState",
+        "title": "Dev Tracker: Inspect Storage State",
+        "category": "Dev Tracker"
+      },
+      {
+        "command": "dev-tracker.cleanup",
+        "title": "Dev Tracker: Clean Storage Data",
+        "category": "Dev Tracker"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "dev-tracker.validate",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorTextFocus"
       }
     ]
   },

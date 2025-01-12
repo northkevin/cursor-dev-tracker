@@ -335,16 +335,15 @@ export const generateDailySummary = async (
   const today = new Date().toISOString().split("T")[0];
   logger.debug("Generating daily summary for:", today);
 
-  const [commands, fileChanges, aiInteractions] = await db.getDayActivities(
-    today
-  );
+  const activities = await db.getDayActivities(today);
+  const { commands, fileChanges, aiInteractions } = activities;
   logger.debug("Activity counts:", {
     commands: commands.length,
     fileChanges: fileChanges.length,
     aiInteractions: aiInteractions.length,
   });
 
-  const activities: ActivityResult = {
+  const activityCounts: ActivityResult = {
     commands: commands.length,
     fileChanges: fileChanges.length,
     aiInteractions: aiInteractions.length,
@@ -362,7 +361,7 @@ export const generateDailySummary = async (
   });
 
   // Update activity summary with time tracking insights
-  const activitySummary = generateActivitySummary(activities);
+  const activitySummary = generateActivitySummary(activityCounts);
   activitySummary.timeSpent = timeTracking.byCategory;
   activitySummary.summary.push(
     `Total active time: ${timeTracking.totalTime.toFixed(1)} minutes`,

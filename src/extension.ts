@@ -6,6 +6,7 @@ import * as history from "./services/historyTracker";
 import * as path from "path";
 import * as fs from "fs";
 import * as postGenerator from "./services/postGenerator";
+import { outputChannel } from "./utils/outputChannel";
 
 // Use either cursor or vscode API
 const api = typeof cursor !== "undefined" ? cursor : vscode;
@@ -13,6 +14,9 @@ const api = typeof cursor !== "undefined" ? cursor : vscode;
 console.log("Dev Tracker: Module loaded"); // This should log even if activation fails
 
 export async function activate(context: vscode.ExtensionContext) {
+  // Initialize output channel
+  outputChannel.log("Dev Tracker Extension Activating...");
+
   // Direct console logs for maximum visibility
   console.log("=".repeat(50));
   console.log("🔥 Dev Tracker Extension - Activation Start");
@@ -26,6 +30,17 @@ export async function activate(context: vscode.ExtensionContext) {
     console.log("\n\n");
     console.log("🔍 Dev Tracker Extension Loading");
     console.log("================================");
+    console.log("🔌 Registering commands...");
+    const commands = [
+      "dev-tracker.status",
+      "dev-tracker.showPost",
+      "dev-tracker.validate",
+    ];
+
+    commands.forEach((cmd) => {
+      console.log(`- Registering ${cmd}`);
+    });
+
     console.log("Extension Path:", __dirname);
     console.log("1. Checking workspace...");
 
@@ -196,13 +211,34 @@ export async function activate(context: vscode.ExtensionContext) {
       }),
       // Add validation command
       api.commands.registerCommand("dev-tracker.validate", async () => {
+        const channel = outputChannel.getChannel();
+        channel.clear();
+        outputChannel.show();
+        outputChannel.log("Starting validation...");
+
+        // Show notification that validation is starting
+        api.window.showInformationMessage(
+          "🔍 Running Dev Tracker validation..."
+        );
+
         console.log("\n=== Dev Tracker Validation ===");
+
+        // Log storage paths
+        const storageUri = context.globalStorageUri;
+        console.log("📂 Storage Location:", storageUri.fsPath);
 
         // Test storage
         const sessions = await db.getStorageData();
         console.log("📊 Storage Test:");
         console.log("- Sessions found:", sessions.length);
         console.log("- Storage keys:", await db.getStorageKeys());
+        console.log("- Current Data:", JSON.stringify(sessions, null, 2));
+
+        // Start a new session if one isn't active
+        if (!session.isSessionActive()) {
+          await session.startSession();
+          console.log("✅ Started new session");
+        }
 
         // Test file tracking
         const testFile = await api.workspace.openTextDocument({
@@ -217,7 +253,117 @@ export async function activate(context: vscode.ExtensionContext) {
         await session.trackAIInteraction("test prompt", "test response");
         console.log("🤖 AI Tracking Test Complete");
 
+        // Show results in UI
+        const validationResults = [
+          "✅ Storage Location: " + storageUri.fsPath,
+          "✅ Sessions Found: " + sessions.length,
+          "✅ File Tracking Test: Complete",
+          "✅ AI Tracking Test: Complete",
+        ].join("\n");
+
+        api.window.showInformationMessage("Validation Complete!", {
+          detail: validationResults,
+          modal: true,
+        });
+
+        // Open output panel to show detailed results
+        channel.appendLine("🔍 Dev Tracker Validation Results");
+        channel.appendLine("=====================================");
+        channel.appendLine(validationResults);
+        channel.appendLine("\n📊 Storage Location:");
+        channel.appendLine(storageUri.fsPath);
+        channel.appendLine("\nDetailed Session Data:");
+        channel.appendLine(JSON.stringify(sessions, null, 2));
+        // Force the output panel to the foreground
+        api.commands.executeCommand("workbench.action.output.show");
+
         console.log("===============================\n");
+      }),
+      // Add state inspection command
+      api.commands.registerCommand("dev-tracker.inspectState", async () => {
+        const sessions = await db.getStorageData();
+        const doc = await api.workspace.openTextDocument({
+          content: JSON.stringify(sessions, null, 2),
+          language: "json",
+        });
+        await api.window.showTextDocument(doc, { preview: false });
+      }),
+      // Add cleanup command
+      api.commands.registerCommand("dev-tracker.cleanup", async () => {
+        outputChannel.log("🧹 Starting data cleanup...");
+
+        const sessions = await db.getStorageData();
+        const cleanSessions = sessions.filter((session) => {
+          // Keep only sessions with valid data
+          return (
+            session.id &&
+            session.startTime &&
+            // Filter out sessions with empty file paths
+            session.fileChanges?.every((fc) => fc.filePath?.length > 0) &&
+            // Filter out sessions older than 30 days
+            new Date(session.startTime).getTime() >
+              Date.now() - 30 * 24 * 60 * 60 * 1000
+          );
+        });
+
+        await db.cleanStorage(cleanSessions);
+        outputChannel.log(
+          `✨ Cleaned up ${
+            sessions.length - cleanSessions.length
+          } invalid sessions`
+        );
+      }),
+      // Add cleanup commands
+      api.commands.registerCommand("dev-tracker.cleanupSessions", async () => {
+        try {
+          outputChannel.log("🧹 Starting session cleanup...");
+          const sessions = await db.getStorageData();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          const cleanSessions = sessions.filter((session) => {
+            const sessionDate = new Date(session.startTime);
+            return (
+              sessionDate > thirtyDaysAgo &&
+              session.fileChanges?.every((fc) => fc.filePath?.length > 0)
+            );
+          });
+
+          await db.cleanStorage(cleanSessions);
+          outputChannel.log(
+            `✨ Cleaned up ${
+              sessions.length - cleanSessions.length
+            } old sessions`
+          );
+          api.window.showInformationMessage(
+            `Cleaned up ${sessions.length - cleanSessions.length} old sessions`
+          );
+        } catch (error) {
+          outputChannel.log(`❌ Cleanup failed: ${error}`);
+          api.window.showErrorMessage(`Failed to clean sessions: ${error}`);
+        }
+      }),
+      api.commands.registerCommand("dev-tracker.resetStorage", async () => {
+        try {
+          const response = await api.window.showWarningMessage(
+            "Are you sure you want to reset all Dev Tracker storage? This cannot be undone.",
+            { modal: true },
+            "Yes, Reset Everything",
+            "Cancel"
+          );
+
+          if (response === "Yes, Reset Everything") {
+            outputChannel.log("🗑️ Resetting all storage...");
+            await db.cleanStorage([]);
+            outputChannel.log("✨ Storage reset complete");
+            api.window.showInformationMessage(
+              "Dev Tracker storage has been reset"
+            );
+          }
+        } catch (error) {
+          outputChannel.log(`❌ Reset failed: ${error}`);
+          api.window.showErrorMessage(`Failed to reset storage: ${error}`);
+        }
       })
     );
 
@@ -233,7 +379,7 @@ export async function activate(context: vscode.ExtensionContext) {
       // Watch for Git changes using file system events
       api.workspace.onDidSaveTextDocument(async (document: any) => {
         if (document.uri.path.includes(".git")) {
-          // Check if it's a git-related file
+          // Don't let fileUtils.ts exclusions affect git tracking
           const gitPath = document.uri.path;
           console.log("🔄 Git file changed:", gitPath);
 
