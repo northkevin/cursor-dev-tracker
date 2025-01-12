@@ -89,16 +89,26 @@ export async function activate(context: vscode.ExtensionContext) {
     } catch (error) {
       console.log("🔄 Running prisma generate...");
       const { exec } = require("child_process");
+      // Get the path to our extension's prisma schema
+      const extensionPrismaPath = path.join(
+        context.extensionPath,
+        "prisma/schema.prisma"
+      );
+      console.log("📁 Using Prisma schema at:", extensionPrismaPath);
+
       await new Promise((resolve, reject) => {
-        exec("npx prisma generate", (error: any) => {
-          if (error) {
-            console.error("❌ Prisma generate failed:", error);
-            reject(error);
-          } else {
-            console.log("✅ Prisma generate completed");
-            resolve(null);
+        exec(
+          `npx prisma generate --schema="${extensionPrismaPath}"`,
+          (error: any) => {
+            if (error) {
+              console.error("❌ Prisma generate failed:", error);
+              reject(error);
+            } else {
+              console.log("✅ Prisma generate completed");
+              resolve(null);
+            }
           }
-        });
+        );
       });
     }
 

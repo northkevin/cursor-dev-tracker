@@ -26,8 +26,29 @@ try {
 
 process.env.DATABASE_URL = `file:${dbPath}`;
 
+// Set environment variables for Prisma
+process.env.PRISMA_SCHEMA_ENGINE_BINARY = path.join(
+  __dirname,
+  "../prisma-engines/schema-engine"
+);
+process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(
+  __dirname,
+  "../prisma-engines/libquery_engine"
+);
+process.env.PRISMA_SCHEMA_PATH = path.join(
+  __dirname,
+  "../prisma/schema.prisma"
+);
+
 // Single PrismaClient instance for the application
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  // Explicitly set the schema path
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
 
 // Add type for transaction
 type TransactionClient = Omit<

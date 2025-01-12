@@ -10,6 +10,8 @@ build/
 prisma/*.db
 prisma/migrations/
 data/
+prisma/client
+*.vsix
 
 # TypeScript
 *.tsbuildinfo
