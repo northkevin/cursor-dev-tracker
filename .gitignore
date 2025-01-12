@@ -5,16 +5,8 @@ node_modules/
 # Build outputs
 dist/
 build/
-
-# Prisma
-prisma/*.db
-prisma/migrations/
 data/
-prisma/client
 *.vsix
-
-# TypeScript
-*.tsbuildinfo
 
 # IDE and editor files
 .vscode/

@@ -83,37 +83,8 @@ export async function activate(context: vscode.ExtensionContext) {
       extensionPath: __dirname,
     });
 
-    // Generate Prisma Client if needed
-    try {
-      await db.$executeRaw`SELECT 1`;
-    } catch (error) {
-      console.log("🔄 Running prisma generate...");
-      const { exec } = require("child_process");
-      // Get the path to our extension's prisma schema
-      const extensionPrismaPath = path.join(
-        context.extensionPath,
-        "prisma/schema.prisma"
-      );
-      console.log("📁 Using Prisma schema at:", extensionPrismaPath);
-
-      await new Promise((resolve, reject) => {
-        exec(
-          `npx prisma generate --schema="${extensionPrismaPath}"`,
-          (error: any) => {
-            if (error) {
-              console.error("❌ Prisma generate failed:", error);
-              reject(error);
-            } else {
-              console.log("✅ Prisma generate completed");
-              resolve(null);
-            }
-          }
-        );
-      });
-    }
-
     // Initialize and verify database
-    await db.initialize();
+    await db.initialize(context);
     console.log("5. Database initialized");
 
     const isDbReady = await db.verifyConnection();
@@ -222,6 +193,27 @@ export async function activate(context: vscode.ExtensionContext) {
           language: "markdown",
         });
         await api.window.showTextDocument(doc, { preview: false });
+      }),
+      // Add validation command
+      api.commands.registerCommand("dev-tracker.validate", async () => {
+        console.log("\n=== Dev Tracker Validation ===");
+
+        // Test storage
+        const sessions = await globalState.get("sessions", []);
+        console.log("📊 Storage Test:");
+        console.log("- Sessions found:", sessions.length);
+        console.log("- Storage keys:", await globalState.keys());
+
+        // Test file tracking
+        const testFile = await api.workspace.openTextDocument({ content: "test" });
+        await session.trackFileChange({ document: testFile });
+        console.log("📝 File Tracking Test Complete");
+
+        // Test AI tracking
+        await session.trackAIInteraction("test prompt", "test response");
+        console.log("🤖 AI Tracking Test Complete");
+
+        console.log("===============================\n");
       })
     );
 

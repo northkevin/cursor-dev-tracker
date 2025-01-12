@@ -1,88 +1,101 @@
-import { PrismaClient } from "../prisma/client";
+import * as vscode from "vscode";
 import { GitOperationData } from "./services/gitTracker";
 import { BuildData } from "./services/buildTestTracker";
 import { TestData } from "./services/buildTestTracker";
 import { logger } from "./utils/logger";
-import * as path from "path";
-import * as fs from "fs";
-import { PrismaClientOptions, Sql } from "../prisma/client/runtime/library";
 
-const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-const dbPath = path.join(
-  homeDir,
-  ".cursor",
-  "dev-tracker",
-  "data",
-  "dev-tracker.db"
-);
+let globalState: vscode.Memento;
 
-// Ensure the directory exists before setting DATABASE_URL
-try {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  console.log("📁 Created database directory at:", path.dirname(dbPath));
-} catch (error) {
-  console.error("❌ Failed to create database directory:", error);
-}
-
-process.env.DATABASE_URL = `file:${dbPath}`;
-
-// Set environment variables for Prisma
-process.env.PRISMA_SCHEMA_ENGINE_BINARY = path.join(
-  __dirname,
-  "../prisma-engines/schema-engine"
-);
-process.env.PRISMA_QUERY_ENGINE_LIBRARY = path.join(
-  __dirname,
-  "../prisma-engines/libquery_engine"
-);
-process.env.PRISMA_SCHEMA_PATH = path.join(
-  __dirname,
-  "../prisma/schema.prisma"
-);
-
-// Single PrismaClient instance for the application
-const prisma = new PrismaClient({
-  // Explicitly set the schema path
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
-
-// Add type for transaction
-type TransactionClient = Omit<
-  PrismaClient,
-  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
->;
-
-export const initialize = async (): Promise<void> => {
-  logger.debug("Initializing database connection");
-  console.log("🔌 Connecting to database at:", dbPath);
-  try {
-    await prisma.$connect();
-    // Force database creation by executing a query
-    await prisma.$executeRaw`SELECT 1`;
-    logger.info("Database connection established");
-    console.log("✅ Database initialized successfully");
-  } catch (error) {
-    console.error("❌ Database initialization failed:", error);
-    throw error;
-  }
+export const initialize = async (
+  context: vscode.ExtensionContext
+): Promise<void> => {
+  globalState = context.globalState;
+  console.log("🗄️ Storage initialization:");
+  console.log("- Global State:", globalState ? "✅" : "❌");
+  console.log("- Storage Keys:", await globalState.keys());
+  console.log("- Sessions:", await globalState.get("sessions", []));
+  logger.info("Storage initialized");
 };
 
 export const createSession = async () => {
-  logger.debug("Creating new session");
-  return await prisma.session.create({
-    data: {},
-  });
+  const session = {
+    id: Date.now().toString(),
+    startTime: new Date(),
+    endTime: null,
+  };
+
+  const sessions = await globalState.get("sessions", []);
+  sessions.push(session);
+  await globalState.update("sessions", sessions);
+  return session;
 };
 
+interface Session {
+  id: string;
+  startTime: Date;
+  endTime: Date | null;
+  fileChanges: FileChange[];
+  aiInteractions: AIInteraction[];
+  commands: Command[];
+}
+
+interface FileChange {
+  id: string;
+  sessionId: string;
+  timestamp: Date;
+  filePath: string;
+  changeType: string;
+}
+
+interface AIInteraction {
+  id: string;
+  sessionId: string;
+  timestamp: Date;
+  prompt: string;
+  response: string;
+}
+
+interface Command {
+  id: string;
+  sessionId: string;
+  timestamp: Date;
+  command: string;
+  type: string;
+  gitData?: {
+    operation: string;
+    branch: string;
+    commitHash?: string;
+    filesChanged?: string | null;
+  };
+  buildData?: {
+    environment: string;
+    framework: string;
+    success: boolean;
+    duration: number;
+    errors: string | null;
+    warnings: string | null;
+    outputLog?: string;
+  };
+  testData?: {
+    framework: string;
+    success: boolean;
+    duration: number;
+    totalTests: number;
+    passedTests: number;
+    failedTests: number;
+    skippedTests: number;
+    errors: string | null;
+    outputLog?: string;
+  };
+}
+
 export const endSession = async (sessionId: string) => {
-  return await prisma.session.update({
-    where: { id: sessionId },
-    data: { endTime: new Date() },
-  });
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === sessionId ? { ...session, endTime: new Date() } : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return updatedSessions.find((s) => s.id === sessionId);
 };
 
 export const recordFileChange = async (data: {
@@ -90,9 +103,23 @@ export const recordFileChange = async (data: {
   filePath: string;
   changeType: string;
 }) => {
-  return await prisma.fileChange.create({
-    data,
-  });
+  const fileChange = {
+    id: Date.now().toString(),
+    timestamp: new Date(),
+    ...data,
+  };
+
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === data.sessionId
+      ? {
+          ...session,
+          fileChanges: [...(session.fileChanges || []), fileChange],
+        }
+      : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return fileChange;
 };
 
 export const recordAIInteraction = async (data: {
@@ -100,9 +127,23 @@ export const recordAIInteraction = async (data: {
   prompt: string;
   response: string;
 }) => {
-  return await prisma.aIInteraction.create({
-    data,
-  });
+  const aiInteraction = {
+    id: Date.now().toString(),
+    timestamp: new Date(),
+    ...data,
+  };
+
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === data.sessionId
+      ? {
+          ...session,
+          aiInteractions: [...(session.aiInteractions || []), aiInteraction],
+        }
+      : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return aiInteraction;
 };
 
 export const recordGitOperation = async (data: {
@@ -110,29 +151,31 @@ export const recordGitOperation = async (data: {
   command: string;
   gitData: GitOperationData;
 }) => {
-  return await prisma.$transaction(async (tx: TransactionClient) => {
-    const command = await tx.command.create({
-      data: {
-        sessionId: data.sessionId,
-        command: data.command,
-        type: "git",
-      },
-    });
+  const command = {
+    id: Date.now().toString(),
+    timestamp: new Date(),
+    sessionId: data.sessionId,
+    command: data.command,
+    type: "git",
+    gitData: {
+      ...data.gitData,
+      filesChanged: data.gitData.filesChanged
+        ? JSON.stringify(data.gitData.filesChanged)
+        : null,
+    },
+  };
 
-    await tx.gitOperation.create({
-      data: {
-        commandId: command.id,
-        operation: data.gitData.operation,
-        branch: data.gitData.branch,
-        commitHash: data.gitData.commitHash,
-        filesChanged: data.gitData.filesChanged
-          ? JSON.stringify(data.gitData.filesChanged)
-          : null,
-      },
-    });
-
-    return command;
-  });
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === data.sessionId
+      ? {
+          ...session,
+          commands: [...(session.commands || []), command],
+        }
+      : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return command;
 };
 
 export const recordBuildOperation = async (data: {
@@ -140,34 +183,34 @@ export const recordBuildOperation = async (data: {
   command: string;
   buildData: BuildData;
 }) => {
-  return await prisma.$transaction(async (tx) => {
-    const command = await tx.command.create({
-      data: {
-        sessionId: data.sessionId,
-        command: data.command,
-        type: "build",
-      },
-    });
+  const command = {
+    id: Date.now().toString(),
+    timestamp: new Date(),
+    sessionId: data.sessionId,
+    command: data.command,
+    type: "build",
+    buildData: {
+      ...data.buildData,
+      errors: data.buildData.errors
+        ? JSON.stringify(data.buildData.errors)
+        : null,
+      warnings: data.buildData.warnings
+        ? JSON.stringify(data.buildData.warnings)
+        : null,
+    },
+  };
 
-    await tx.buildOperation.create({
-      data: {
-        commandId: command.id,
-        environment: data.buildData.environment,
-        framework: data.buildData.framework,
-        success: data.buildData.success,
-        duration: data.buildData.duration,
-        errors: data.buildData.errors
-          ? JSON.stringify(data.buildData.errors)
-          : null,
-        warnings: data.buildData.warnings
-          ? JSON.stringify(data.buildData.warnings)
-          : null,
-        outputLog: data.buildData.outputLog,
-      },
-    });
-
-    return command;
-  });
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === data.sessionId
+      ? {
+          ...session,
+          commands: [...(session.commands || []), command],
+        }
+      : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return command;
 };
 
 export const recordTestOperation = async (data: {
@@ -175,34 +218,31 @@ export const recordTestOperation = async (data: {
   command: string;
   testData: TestData;
 }) => {
-  return await prisma.$transaction(async (tx) => {
-    const command = await tx.command.create({
-      data: {
-        sessionId: data.sessionId,
-        command: data.command,
-        type: "test",
-      },
-    });
+  const command = {
+    id: Date.now().toString(),
+    timestamp: new Date(),
+    sessionId: data.sessionId,
+    command: data.command,
+    type: "test",
+    testData: {
+      ...data.testData,
+      errors: data.testData.errors
+        ? JSON.stringify(data.testData.errors)
+        : null,
+    },
+  };
 
-    await tx.testOperation.create({
-      data: {
-        commandId: command.id,
-        framework: data.testData.framework,
-        success: data.testData.success,
-        duration: data.testData.duration,
-        totalTests: data.testData.totalTests,
-        passedTests: data.testData.passedTests,
-        failedTests: data.testData.failedTests,
-        skippedTests: data.testData.skippedTests,
-        errors: data.testData.errors
-          ? JSON.stringify(data.testData.errors)
-          : null,
-        outputLog: data.testData.outputLog,
-      },
-    });
-
-    return command;
-  });
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const updatedSessions = sessions.map((session) =>
+    session.id === data.sessionId
+      ? {
+          ...session,
+          commands: [...(session.commands || []), command],
+        }
+      : session
+  );
+  await globalState.update("sessions", updatedSessions);
+  return command;
 };
 
 export const getDayActivities = async (date: string) => {
@@ -210,55 +250,19 @@ export const getDayActivities = async (date: string) => {
   const endOfDay = new Date(date);
   endOfDay.setDate(endOfDay.getDate() + 1);
 
-  return await prisma.$transaction([
-    prisma.command.findMany({
-      where: {
-        timestamp: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
-      },
-      include: {
-        gitData: true,
-        buildData: true,
-        testData: true,
-      },
-    }),
-    prisma.fileChange.findMany({
-      where: {
-        timestamp: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
-      },
-    }),
-    prisma.aIInteraction.findMany({
-      where: {
-        timestamp: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
-      },
-    }),
-  ]);
+  const sessions = await globalState.get<Session[]>("sessions", []);
+  const dayActivities = sessions.filter((session) => {
+    const sessionDate = new Date(session.startTime);
+    return sessionDate >= startOfDay && sessionDate < endOfDay;
+  });
+
+  return {
+    commands: dayActivities.flatMap((s) => s.commands || []),
+    fileChanges: dayActivities.flatMap((s) => s.fileChanges || []),
+    aiInteractions: dayActivities.flatMap((s) => s.aiInteractions || []),
+  };
 };
 
 export const verifyConnection = async (): Promise<boolean> => {
-  try {
-    console.log("🔍 Verifying database connection...");
-    await prisma.$queryRaw`SELECT 1`;
-    console.log("✅ Database connection verified");
-    return true;
-  } catch (error) {
-    logger.error("Database verification failed:", error);
-    console.error("❌ Database error details:", error);
-    return false;
-  }
-};
-
-export const $executeRaw = async (
-  query: TemplateStringsArray | Sql,
-  ...values: any[]
-) => {
-  return await prisma.$executeRaw(query, ...values);
+  return globalState !== undefined;
 };

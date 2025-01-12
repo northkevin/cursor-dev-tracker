@@ -10,12 +10,11 @@
   },
   "scripts": {
     "build": "tsc",
-    "prisma:generate": "prisma generate",
-    "clean": "rimraf dist prisma/client",
+    "clean": "rimraf dist",
     "watch": "tsc -w --preserveWatchOutput",
     "lint": "eslint src --ext ts",
     "test": "jest",
-    "package": "pnpm clean && pnpm prisma:generate && pnpm build && pnpm exec vsce package --allow-star-activation --no-yarn"
+    "package": "pnpm clean && pnpm build && pnpm exec vsce package --allow-star-activation --no-yarn"
   },
   "engines": {
     "vscode": "^1.80.0",
@@ -36,11 +35,14 @@
       {
         "command": "dev-tracker.showPost",
         "title": "Dev Tracker: Show Brain Upgrade Post"
+      },
+      {
+        "command": "dev-tracker.validate",
+        "title": "Dev Tracker: Run Validation Tests"
       }
     ]
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
@@ -53,7 +55,6 @@
     "@vscode/vsce": "^2.24.0",
     "eslint": "^8.57.0",
     "jest": "^29.x",
-    "prisma": "^5.x",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.x",
     "typescript": "^5.x"

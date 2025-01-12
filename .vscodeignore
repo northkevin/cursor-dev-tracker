@@ -15,3 +15,7 @@ node_modules/**
 !prisma/client/**
 !prisma/schema.prisma
 !src/types/**
+.prettierrc
+scripts/**
+coverage/**
+!dist/**/*.js
